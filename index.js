@@ -1,63 +1,56 @@
 const express = require('express');
 const cors = require('cors');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware para permitir CORS y parsear JSON
 app.use(cors());
 app.use(express.json());
 
-// Función simulada para generar token - aquí agrega tu lógica real
-function generarToken(urlBase, ip) {
-  // Ejemplo: un token ficticio, aquí pondrías el algoritmo real
-  // Podrías usar JWT, HMAC, etc.
-  // Recuerda que el token puede depender de la URL base y la IP
-  return 'TOKEN_GENERADO_SEGURAMENTE';
-}
-
-// Endpoint para generar URL con token + IP
-app.post('/generate-url', (req, res) => {
-  const { baseUrl } = req.body;
-  if (!baseUrl) {
-    return res.status(400).json({ error: 'Falta el parámetro baseUrl' });
+// Endpoint que recibe la URL completa (con token) y proxy al stream
+app.post('/proxy-stream', (req, res, next) => {
+  const { fullUrl } = req.body;
+  if (!fullUrl) {
+    return res.status(400).json({ error: 'Falta el parámetro fullUrl' });
   }
-
-  // Obtener IP real del cliente
-  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
-  if (ip.includes(',')) {
-    ip = ip.split(',')[0].trim(); // En caso de proxies múltiples
-  }
-  if (ip.includes('::ffff:')) {
-    ip = ip.split('::ffff:')[1];
-  }
-
-  // Generar token (simulado)
-  const token = generarToken(baseUrl, ip);
 
   try {
-    const urlObj = new URL(baseUrl);
-
-    // Reemplazar o agregar ip y token en la URL
-    urlObj.searchParams.set('ip', ip);
-    urlObj.searchParams.set('token', token);
-
-    const finalUrl = urlObj.toString();
-
-    console.log(`URL generada para IP ${ip}: ${finalUrl}`);
-
-    return res.json({ url: finalUrl });
+    // Validar que fullUrl sea URL válida
+    new URL(fullUrl);
+    req.fullUrl = fullUrl;
+    next();
   } catch (error) {
-    console.error('Error al construir la URL:', error);
-    return res.status(500).json({ error: 'Error interno al procesar la URL' });
+    return res.status(400).json({ error: 'URL inválida' });
   }
 });
 
-// Ruta raíz para prueba rápida
-app.get('/', (req, res) => {
-  res.send('Backend de generación de URLs de streaming con token');
+// Proxy middleware dinámico según URL recibida
+app.use('/proxy-stream', (req, res, next) => {
+  if (!req.fullUrl) {
+    return res.status(400).json({ error: 'No se proporcionó URL para proxy' });
+  }
+
+  // Extraer origen base (protocolo + host) para proxy
+  const urlObj = new URL(req.fullUrl);
+  const target = urlObj.origin;
+
+  // Crear path con pathname + search params
+  const path = urlObj.pathname + urlObj.search;
+
+  createProxyMiddleware({
+    target,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/proxy-stream': path,
+    },
+    logLevel: 'debug',
+  })(req, res, next);
 });
 
-// Iniciar servidor
+app.get('/', (req, res) => {
+  res.send('Proxy puro para streaming, recibe URLs completas con token');
+});
+
 app.listen(PORT, () => {
-  console.log(`Servidor backend corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor backend proxy corriendo en http://localhost:${PORT}`);
 });
