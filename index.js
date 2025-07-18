@@ -35,15 +35,11 @@ app.post('/generate-url', (req, res) => {
   const token = generarToken(baseUrl, ip);
 
   try {
-    // Construir URL final evitando parámetros duplicados
     const urlObj = new URL(baseUrl);
 
-    if (!urlObj.searchParams.has('ip')) {
-      urlObj.searchParams.append('ip', ip);
-    }
-    if (!urlObj.searchParams.has('token')) {
-      urlObj.searchParams.append('token', token);
-    }
+    // Reemplazar o agregar ip y token en la URL
+    urlObj.searchParams.set('ip', ip);
+    urlObj.searchParams.set('token', token);
 
     const finalUrl = urlObj.toString();
 
