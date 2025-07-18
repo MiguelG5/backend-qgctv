@@ -6,10 +6,10 @@ const http = require('http');
 const https = require('https');
 const app = express();
 
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
@@ -50,12 +50,10 @@ app.get('/relay/:id', async (req, res) => {
       httpsAgent: agent,
     });
 
-    // Reenvía encabezados esenciales
     res.set({
       'Content-Type': streamResponse.headers['content-type'] || 'application/octet-stream',
       'Cache-Control': 'no-cache',
       'Access-Control-Allow-Origin': '*',
-      // Otros headers que quieras pasar
     });
 
     streamResponse.data.pipe(res);
@@ -65,6 +63,7 @@ app.get('/relay/:id', async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log('Servidor Relay corriendo');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor Relay corriendo en puerto ${PORT}`);
 });
