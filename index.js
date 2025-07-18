@@ -34,13 +34,26 @@ app.post('/generate-url', (req, res) => {
   // Generar token (simulado)
   const token = generarToken(baseUrl, ip);
 
-  // Construir URL final con query params
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  const finalUrl = `${baseUrl}${separator}ip=${ip}&token=${token}`;
+  try {
+    // Construir URL final evitando parámetros duplicados
+    const urlObj = new URL(baseUrl);
 
-  console.log(`URL generada para IP ${ip}: ${finalUrl}`);
+    if (!urlObj.searchParams.has('ip')) {
+      urlObj.searchParams.append('ip', ip);
+    }
+    if (!urlObj.searchParams.has('token')) {
+      urlObj.searchParams.append('token', token);
+    }
 
-  res.json({ url: finalUrl });
+    const finalUrl = urlObj.toString();
+
+    console.log(`URL generada para IP ${ip}: ${finalUrl}`);
+
+    return res.json({ url: finalUrl });
+  } catch (error) {
+    console.error('Error al construir la URL:', error);
+    return res.status(500).json({ error: 'Error interno al procesar la URL' });
+  }
 });
 
 // Ruta raíz para prueba rápida
